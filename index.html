@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>世足機率分析台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>世足機率分析台</h1>
+    <div class="sub">Poisson · Dixon-Coles · xG blend · 90 分鐘賽果</div>
+  </header>
+
+  <section class="panel">
+    <span class="tag">範例：2026 決賽 西班牙 vs 阿根廷（數值請換成你的資料）</span>
+    <div class="teams">
+      <div class="team">
+        <label class="full">主隊<input type="text" id="hName" value="西班牙"></label>
+        <label>場均進球<input type="number" id="hGF" step="0.05" value="2.10"></label>
+        <label>場均失球<input type="number" id="hGA" step="0.05" value="0.15"></label>
+        <label>場均 xG<input type="number" id="hXG" step="0.05" value="2.00"></label>
+        <label>場均 xGA<input type="number" id="hXGA" step="0.05" value="0.60"></label>
+      </div>
+      <div class="vs">VS</div>
+      <div class="team">
+        <label class="full">客隊<input type="text" id="aName" value="阿根廷"></label>
+        <label>場均進球<input type="number" id="aGF" step="0.05" value="1.85"></label>
+        <label>場均失球<input type="number" id="aGA" step="0.05" value="0.85"></label>
+        <label>場均 xG<input type="number" id="aXG" step="0.05" value="1.60"></label>
+        <label>場均 xGA<input type="number" id="aXGA" step="0.05" value="0.95"></label>
+      </div>
+    </div>
+    <details open>
+      <summary>進階參數</summary>
+      <div class="adv">
+        <label>xG 權重 w（0–1）<input type="number" id="w" step="0.1" min="0" max="1" value="0.6"></label>
+        <label>賽事場均總進球<input type="number" id="avg" step="0.05" value="2.6"></label>
+        <label>主場優勢係數<input type="number" id="hAdv" step="0.01" value="1.00"></label>
+        <label>Dixon-Coles ρ<input type="number" id="rho" step="0.01" value="-0.10"></label>
+        <label>和局加成 δ<input type="number" id="delta" step="0.05" value="1.00"></label>
+      </div>
+      <p class="hint">w=0 只用實際進球，w=1 只用 xG。回測 20 場時 w=0.6 命中率較高（65%），純進球版 Brier 較低。世足中立場建議主場係數 1.00–1.05。δ 會乘上所有平手比分格；之前 δ=1.3 在樣本外表現變差，預設先關掉（1.00）。</p>
+    </details>
+    <div class="row">
+      <button id="calc">計算機率</button>
+      <span class="lam" id="lam"></span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>賽果機率</h2>
+    <div class="tiles">
+      <div class="tile"><span class="lbl">勝平負 1X2</span><div id="t1x2"></div></div>
+      <div class="tile"><span class="lbl">大小 2.5 球</span><div id="tou"></div></div>
+      <div class="tile"><span class="lbl">雙方進球 BTTS</span><div id="tbtts"></div></div>
+    </div>
+    <div class="tile"><span class="lbl">最可能比分</span><div class="top" id="topScores"></div></div>
+  </section>
+
+  <section class="panel">
+    <h2>比分矩陣</h2>
+    <p class="hint">列為主隊進球、欄為客隊進球。虛線框為平手比分。</p>
+    <div class="gridwrap"><table class="matrix" id="matrix"></table></div>
+  </section>
+
+  <section class="panel">
+    <h2>EV 與注碼</h2>
+    <div class="row">
+      <label style="max-width:160px">Kelly 比例<select id="kf"><option value="1">全 Kelly</option><option value="0.5">1/2 Kelly</option><option value="0.25" selected>1/4 Kelly</option></select></label>
+      <label style="max-width:160px">本金<input type="number" id="bank" step="100" value="1000"></label>
+    </div>
+    <div class="gridwrap">
+      <table class="ev">
+        <thead><tr><th>選項</th><th>賠率</th><th>莊家隱含%</th><th>去水後%</th><th>模型%</th><th>EV</th><th>建議注碼</th></tr></thead>
+        <tbody id="evBody"></tbody>
+      </table>
+    </div>
+    <p class="hint" id="vig"></p>
+  </section>
+
+  <section class="panel">
+    <h2>回測紀錄</h2>
+    <p class="hint">台灣運彩以 90 分鐘結算，延長賽和 PK 晉級都算「和」。紀錄存在這個瀏覽器裡。</p>
+    <div class="row">
+      <label style="max-width:180px">90 分鐘結果<select id="res"><option value="H">主勝</option><option value="D">和局</option><option value="A">客勝</option></select></label>
+      <button class="ghost" id="addLog">記錄這場</button>
+      <button class="ghost" id="clearLog">清空紀錄</button>
+    </div>
+    <div class="stats" id="logStats"></div>
+    <div class="gridwrap"><table class="log" style="width:100%"><thead><tr><th>對戰</th><th>主/和/客 %</th><th>結果</th><th>Brier</th><th>命中</th><th></th></tr></thead><tbody id="logBody"></tbody></table></div>
+    <p class="empty" id="logEmpty">還沒有紀錄。算完一場、選好 90 分鐘結果後按「記錄這場」。</p>
+  </section>
+</div>
+<script src="src/model.js"></script>
+<script src="src/app.js"></script>
+</body>
+</html>
